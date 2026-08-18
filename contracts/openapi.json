@@ -1,0 +1,123 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "代码逆向 Agent API",
+    "version": "1.0.0",
+    "description": "面向 libuv、Redis 和通用 C/C++ 仓库的证据约束代码逆向分析接口。"
+  },
+  "servers": [{ "url": "http://127.0.0.1:8765" }],
+  "tags": [
+    { "name": "analyses", "description": "创建和读取分析任务" },
+    { "name": "graph", "description": "读取统一 Evidence IR 图" },
+    { "name": "queries", "description": "基于分析证据提问" }
+  ],
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "tags": ["analyses"],
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "服务可用",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "analysis.resource.schema.json#/$defs/health" },
+                "example": { "status": "ok", "service": "code-reverse-agent", "schema_version": "1.0" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/analyses": {
+      "post": {
+        "tags": ["analyses"],
+        "operationId": "createAnalysis",
+        "summary": "创建一次仓库分析",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "analysis.create.schema.json" } }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "任务已排队或已完成（Demo 可同步返回 completed）",
+            "headers": {
+              "Location": { "schema": { "type": "string" }, "description": "分析资源地址" }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "analysis.resource.schema.json" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/v1/analyses/{analysis_id}": {
+      "parameters": [{ "$ref": "#/components/parameters/AnalysisId" }],
+      "get": {
+        "tags": ["analyses"],
+        "operationId": "getAnalysis",
+        "responses": {
+          "200": { "description": "分析任务", "content": { "application/json": { "schema": { "$ref": "analysis.resource.schema.json" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/v1/analyses/{analysis_id}/graph": {
+      "parameters": [{ "$ref": "#/components/parameters/AnalysisId" }],
+      "get": {
+        "tags": ["graph"],
+        "operationId": "getGraph",
+        "parameters": [
+          { "name": "configuration_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "node_kind", "in": "query", "schema": { "type": "string" } },
+          { "name": "edge_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 5000, "default": 500 } }
+        ],
+        "responses": {
+          "200": { "description": "分页图数据", "content": { "application/json": { "schema": { "$ref": "graph.response.schema.json" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/v1/queries": {
+      "post": {
+        "tags": ["queries"],
+        "operationId": "queryAnalysis",
+        "summary": "针对分析结果提问",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "query.request.schema.json" } } }
+        },
+        "responses": {
+          "200": { "description": "带引用的解释结果", "content": { "application/json": { "schema": { "$ref": "query.response.schema.json" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "AnalysisId": {
+        "name": "analysis_id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "pattern": "^an_[A-Za-z0-9_-]+$" }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "请求参数错误",
+        "content": { "application/json": { "schema": { "$ref": "error.schema.json" } } }
+      },
+      "NotFound": {
+        "description": "资源不存在",
+        "content": { "application/json": { "schema": { "$ref": "error.schema.json" } } }
+      }
+    }
+  }
+}

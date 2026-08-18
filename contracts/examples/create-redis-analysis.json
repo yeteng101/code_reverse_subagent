@@ -1,0 +1,30 @@
+{
+  "request_id": "demo-redis-linux-release",
+  "repository": {
+    "name": "redis",
+    "kind": "redis",
+    "path": "targets/redis",
+    "url": "https://github.com/redis/redis",
+    "revision": "unstable",
+    "language": "c_cpp"
+  },
+  "build": {
+    "mode": "auto",
+    "configurations": [
+      {
+        "id": "linux-release",
+        "target": "x86_64-linux-gnu",
+        "compiler": "gcc",
+        "defines": { "NDEBUG": 1 },
+        "include_dirs": ["src", "deps"],
+        "flags": ["-O2"]
+      }
+    ],
+    "default_configuration": "linux-release"
+  },
+  "analysis": {
+    "profiles": ["generic_c_cpp", "redis"],
+    "extractors": ["calls", "function_pointers", "callbacks", "async", "macros", "modules", "lifecycle"],
+    "max_call_depth": 8
+  }
+}

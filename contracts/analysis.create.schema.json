@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://code-reverse-agent.local/schemas/analysis.create.schema.json",
+  "title": "CreateAnalysisRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["repository"],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "description": "客户端幂等键。相同键在有效期内返回同一分析任务。",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "build": {
+      "$ref": "#/$defs/build"
+    },
+    "analysis": {
+      "$ref": "#/$defs/analysisOptions"
+    }
+  },
+  "$defs": {
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "path"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "kind": { "type": "string", "enum": ["libuv", "redis", "custom"] },
+        "path": { "type": "string", "description": "服务器工作区内的源码目录或文件。" },
+        "url": { "type": "string", "format": "uri" },
+        "revision": { "type": "string", "description": "Git commit、tag 或分支。" },
+        "language": { "type": "string", "enum": ["c", "cpp", "c_cpp"], "default": "c_cpp" }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["auto", "compile_commands", "manual"], "default": "auto" },
+        "compile_commands": { "type": "string", "description": "相对于 repository.path 的 compile_commands.json 路径。" },
+        "configurations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/configuration" },
+          "maxItems": 32
+        },
+        "default_configuration": { "type": "string" }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "target"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+        "target": { "type": "string", "minLength": 1 },
+        "compiler": { "type": "string" },
+        "defines": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
+        },
+        "include_dirs": { "type": "array", "items": { "type": "string" } },
+        "flags": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "analysisOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["generic_c_cpp", "libuv", "redis"] },
+          "uniqueItems": true,
+          "default": ["generic_c_cpp"]
+        },
+        "extractors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["calls", "virtual_calls", "function_pointers", "callbacks", "async", "macros", "modules", "lifecycle"]
+          },
+          "uniqueItems": true
+        },
+        "max_call_depth": { "type": "integer", "minimum": 1, "maximum": 20, "default": 6 },
+        "include_system_headers": { "type": "boolean", "default": false },
+        "dynamic_trace": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "trace_path": { "type": "string" },
+            "format": { "type": "string", "enum": ["chrome_trace", "perf_script", "custom"] }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://code-reverse-agent.local/schemas/query.request.schema.json",
+  "title": "QueryRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["analysis_id", "question"],
+  "properties": {
+    "analysis_id": { "type": "string", "pattern": "^an_[A-Za-z0-9_-]+$" },
+    "question": { "type": "string", "minLength": 1, "maxLength": 4000 },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "node_ids": { "type": "array", "items": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" }, "maxItems": 100 },
+        "configuration_ids": { "type": "array", "items": { "type": "string" }, "maxItems": 32 },
+        "edge_types": { "type": "array", "items": { "type": "string" }, "maxItems": 16 },
+        "direction": { "type": "string", "enum": ["forward", "backward", "both"], "default": "both" },
+        "max_hops": { "type": "integer", "minimum": 0, "maximum": 8, "default": 3 }
+      }
+    },
+    "response_format": { "type": "string", "enum": ["text", "structured", "both"], "default": "both" },
+    "include_source": { "type": "boolean", "default": true }
+  }
+}

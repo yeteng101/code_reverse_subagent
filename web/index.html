@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>代码逆向 Agent</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">CR</span>
+      <div>
+        <h1>代码逆向 Agent</h1>
+        <p>Evidence-first code intelligence</p>
+      </div>
+    </div>
+    <div class="engine-state"><span></span> 离线分析引擎</div>
+  </header>
+
+  <main class="workspace">
+    <aside class="repo-panel">
+      <section>
+        <div class="section-heading">
+          <h2>分析目标</h2>
+          <button id="load-demo" class="link-button" type="button">载入样例</button>
+        </div>
+        <label for="repo-path">工作区内文件或目录</label>
+        <div class="path-control">
+          <input id="repo-path" value="selected_children.cpp" spellcheck="false">
+          <button id="analyze" type="button">分析</button>
+        </div>
+        <p class="field-note" id="workspace-note">正在连接本地引擎...</p>
+      </section>
+
+      <section>
+        <h2>模块</h2>
+        <div id="module-list" class="module-list"><p class="empty">等待分析</p></div>
+      </section>
+
+      <section>
+        <h2>关系图例</h2>
+        <div class="legend">
+          <span><i class="line direct"></i>直接调用</span>
+          <span><i class="line async"></i>异步调度</span>
+          <span><i class="line callback"></i>回调</span>
+          <span><i class="line pointer"></i>函数指针</span>
+        </div>
+      </section>
+
+      <section class="limitations">
+        <h2>分析边界</h2>
+        <p>当前为轻量 C/C++ 静态分析 Demo。所有推断关系均显示置信度和源码证据。</p>
+      </section>
+    </aside>
+
+    <section class="graph-panel">
+      <div class="summary-strip" id="summary-strip" aria-label="分析摘要">
+        <div><span>文件</span><strong>-</strong></div>
+        <div><span>函数</span><strong>-</strong></div>
+        <div><span>关系</span><strong>-</strong></div>
+        <div><span>宏</span><strong>-</strong></div>
+      </div>
+
+      <div class="graph-toolbar">
+        <div class="view-title">
+          <h2>函数调用关系</h2>
+          <span id="target-label">尚未加载</span>
+        </div>
+        <div class="toolbar-actions">
+          <label class="search-control">
+            <span class="sr-only">搜索函数</span>
+            <input id="function-search" type="search" placeholder="搜索函数">
+          </label>
+          <button id="fit-graph" class="secondary-button" type="button">适应画布</button>
+        </div>
+      </div>
+
+      <div class="edge-filters" aria-label="关系类型筛选">
+        <button type="button" class="filter active" data-edge="direct">直接调用</button>
+        <button type="button" class="filter active" data-edge="async">异步</button>
+        <button type="button" class="filter active" data-edge="callback">回调</button>
+        <button type="button" class="filter active" data-edge="function_pointer">函数指针</button>
+      </div>
+
+      <div id="graph-stage" class="graph-stage">
+        <svg id="call-graph" role="img" aria-label="函数调用关系图">
+          <g id="graph-root"></g>
+        </svg>
+        <div id="graph-empty" class="graph-empty">
+          <strong>等待代码分析</strong>
+          <span>载入内置样例，或分析工作区中的 C/C++ 文件。</span>
+        </div>
+      </div>
+
+      <div id="node-detail" class="node-detail" hidden></div>
+    </section>
+
+    <aside class="insight-panel">
+      <section>
+        <p class="eyebrow">分析结论</p>
+        <h2>向代码提问</h2>
+        <div class="suggestions">
+          <button type="button" data-question="请概括项目架构">概括架构</button>
+          <button type="button" data-question="入口调用链是什么？">入口调用链</button>
+          <button type="button" data-question="有哪些异步回调？">异步回调</button>
+          <button type="button" data-question="分析函数指针">函数指针</button>
+          <button type="button" data-question="有哪些条件编译宏？">编译宏</button>
+        </div>
+      </section>
+
+      <section id="answer-panel" class="answer-panel" aria-live="polite">
+        <div class="empty-answer">
+          <span class="prompt-mark">?</span>
+          <p>完成分析后，可以询问架构、入口链、异步回调、函数指针和宏。</p>
+        </div>
+      </section>
+
+      <form id="query-form" class="query-form">
+        <label class="sr-only" for="question">关于代码的问题</label>
+        <textarea id="question" rows="3" placeholder="例如：process_request 调用了什么？"></textarea>
+        <div>
+          <span>回答将引用源码证据</span>
+          <button type="submit">分析问题</button>
+        </div>
+      </form>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

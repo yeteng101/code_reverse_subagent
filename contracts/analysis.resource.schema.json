@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://code-reverse-agent.local/schemas/analysis.resource.schema.json",
+  "title": "AnalysisResource",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["resource_type", "schema_version", "analysis_id", "status", "repository", "summary", "timestamps"],
+  "properties": {
+    "resource_type": { "const": "analysis" },
+    "schema_version": { "type": "string", "const": "1.0" },
+    "analysis_id": { "type": "string", "pattern": "^an_[A-Za-z0-9_-]+$" },
+    "status": { "type": "string", "enum": ["queued", "preparing", "parsing", "indexing", "completed", "failed", "cancelled"] },
+    "repository": { "$ref": "analysis.create.schema.json#/$defs/repository" },
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "percent"],
+      "properties": {
+        "stage": { "type": "string", "enum": ["queued", "preparing", "parsing", "indexing", "completed", "failed", "cancelled"] },
+        "percent": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "message": { "type": "string" },
+        "files_processed": { "type": "integer", "minimum": 0 },
+        "files_total": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_count", "function_count", "node_count", "edge_count", "macro_count"],
+      "properties": {
+        "file_count": { "type": "integer", "minimum": 0 },
+        "function_count": { "type": "integer", "minimum": 0 },
+        "node_count": { "type": "integer", "minimum": 0 },
+        "edge_count": { "type": "integer", "minimum": 0 },
+        "macro_count": { "type": "integer", "minimum": 0 },
+        "unresolved_count": { "type": "integer", "minimum": 0 },
+        "by_edge_type": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+      }
+    },
+    "configurations": {
+      "type": "array",
+      "items": { "$ref": "analysis.create.schema.json#/$defs/configuration" }
+    },
+    "limitations": { "type": "array", "items": { "type": "string" } },
+    "error": { "$ref": "error.schema.json" },
+    "timestamps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created_at", "updated_at"],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "links": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "self": { "type": "string", "format": "uri-reference" },
+        "graph": { "type": "string", "format": "uri-reference" },
+        "query": { "type": "string", "format": "uri-reference" }
+      }
+    }
+  },
+  "$defs": {
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "service", "schema_version"],
+      "properties": {
+        "status": { "const": "ok" },
+        "service": { "type": "string" },
+        "schema_version": { "type": "string", "const": "1.0" }
+      }
+    }
+  }
+}

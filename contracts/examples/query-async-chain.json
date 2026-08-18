@@ -1,0 +1,12 @@
+{
+  "analysis_id": "an_01JLIBUVLINUXDEBUG",
+  "question": "从 uv_read_start 到用户 read callback 的异步调用链是什么？请标出注册、poll 调度和回调执行。",
+  "scope": {
+    "configuration_ids": ["linux-debug"],
+    "edge_types": ["registers_callback", "scheduled_by", "invokes_callback"],
+    "direction": "forward",
+    "max_hops": 6
+  },
+  "response_format": "both",
+  "include_source": true
+}

@@ -1,0 +1,33 @@
+{
+  "request_id": "demo-libuv-linux-debug",
+  "repository": {
+    "name": "libuv",
+    "kind": "libuv",
+    "path": "targets/libuv",
+    "url": "https://github.com/libuv/libuv",
+    "revision": "v1.48.0",
+    "language": "c_cpp"
+  },
+  "build": {
+    "mode": "compile_commands",
+    "compile_commands": "build/compile_commands.json",
+    "configurations": [
+      {
+        "id": "linux-debug",
+        "target": "x86_64-linux-gnu",
+        "compiler": "clang",
+        "defines": { "DEBUG": 1, "_GNU_SOURCE": 1 },
+        "include_dirs": ["include", "src"],
+        "flags": ["-O0", "-g"]
+      }
+    ],
+    "default_configuration": "linux-debug"
+  },
+  "analysis": {
+    "profiles": ["generic_c_cpp", "libuv"],
+    "extractors": ["calls", "function_pointers", "callbacks", "async", "macros", "modules", "lifecycle"],
+    "max_call_depth": 8,
+    "include_system_headers": false,
+    "dynamic_trace": { "enabled": false }
+  }
+}
