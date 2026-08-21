@@ -30,7 +30,7 @@
       "properties": {
         "name": { "type": "string", "minLength": 1, "maxLength": 120 },
         "kind": { "type": "string", "enum": ["libuv", "redis", "custom"] },
-        "path": { "type": "string", "description": "服务器工作区内的源码目录或文件。" },
+        "path": { "type": "string", "minLength": 1, "description": "服务器工作区内的源码目录或文件。" },
         "url": { "type": "string", "format": "uri" },
         "revision": { "type": "string", "description": "Git commit、tag 或分支。" },
         "language": { "type": "string", "enum": ["c", "cpp", "c_cpp"], "default": "c_cpp" }
@@ -47,15 +47,21 @@
           "items": { "$ref": "#/$defs/configuration" },
           "maxItems": 32
         },
-        "default_configuration": { "type": "string" }
-      }
+        "default_configuration": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "compile_commands" } }, "required": ["mode"] },
+          "then": { "required": ["compile_commands"] }
+        }
+      ]
     },
     "configuration": {
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "target"],
       "properties": {
-        "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$", "minLength": 1, "maxLength": 128 },
         "target": { "type": "string", "minLength": 1 },
         "compiler": { "type": "string" },
         "defines": {

@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import mimetypes
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -18,6 +19,16 @@ from analyzer import AnalysisExplainer, CodeAnalyzer
 APP_DIR = Path(__file__).resolve().parent
 WEB_DIR = APP_DIR / "web"
 SAMPLE_FILE = APP_DIR / "samples" / "async_pipeline.cpp"
+GRAPH_NODE_KINDS = {
+    "repository", "module", "file", "function", "method", "type", "variable",
+    "macro", "event_loop", "handle", "request", "callback", "scheduler",
+    "io_watcher", "timer", "phase", "entry_point",
+}
+GRAPH_EDGE_TYPES = {
+    "direct", "virtual", "callback", "async", "function_pointer",
+    "registers_callback", "scheduled_by", "invokes_callback", "owns_lifecycle",
+    "reads", "writes", "macro_variant", "unresolved",
+}
 
 
 class DemoState:
@@ -49,11 +60,36 @@ class DemoState:
         raw_path = repository.get("path")
         if not isinstance(raw_path, str) or not raw_path.strip():
             raise ValueError("repository.path 不能为空")
-        analysis = self.analyze(raw_path)
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        api_id = f"an_{analysis['analysis_id']}"
         build = body.get("build") if isinstance(body.get("build"), dict) else {}
         options = body.get("analysis") if isinstance(body.get("analysis"), dict) else {}
+        configurations = build.get("configurations", [])
+        if not isinstance(configurations, list):
+            raise ValueError("build.configurations 必须是数组")
+        configuration_ids = [
+            item.get("id") for item in configurations
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        ]
+        if len(configuration_ids) != len(set(configuration_ids)):
+            raise ValueError("build.configurations.id 必须唯一")
+        target = self._resolve_target(raw_path)
+        identity = {
+            "repository": {
+                "path": str(target),
+                "kind": repository.get("kind", "custom"),
+                "revision": repository.get("revision"),
+            },
+            "build": build,
+            "analysis": options,
+            "request_id": body.get("request_id"),
+        }
+        analysis = self.analyzer.analyze(
+            target,
+            configurations=configurations,
+            identity=identity,
+        )
+        self.analyses[analysis["analysis_id"]] = analysis
+        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        api_id = f"an_{analysis['analysis_id']}"
         resource = {
             "resource_type": "analysis",
             "schema_version": "1.0",
@@ -87,6 +123,7 @@ class DemoState:
                     if key.endswith("_calls")
                 },
             },
+            "profile": analysis["profile"],
             "configurations": build.get("configurations", []),
             "limitations": analysis["limitations"],
             "timestamps": {"created_at": now, "updated_at": now, "completed_at": now},
@@ -117,12 +154,28 @@ class DemoState:
         node_ids = {fn["id"]: f"n_{fn['id']}" for fn in functions}
         selected_kind = params.get("node_kind")
         selected_edge = params.get("edge_type")
-        nodes = []
+        selected_configuration = params.get("configuration_id")
+        if selected_kind and selected_kind not in GRAPH_NODE_KINDS:
+            raise ValueError(f"node_kind 无效：{selected_kind}")
+        if selected_edge and selected_edge not in GRAPH_EDGE_TYPES:
+            raise ValueError(f"edge_type 无效：{selected_edge}")
+        config_ids = [
+            item["id"]
+            for item in resource.get("configurations", [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        ]
+        if selected_configuration and selected_configuration not in config_ids:
+            raise ValueError(f"configuration_id 不属于分析 {api_id}：{selected_configuration}")
+
+        nodes_by_id = {}
         for fn in functions:
             kind = "function" if fn.get("kind") == "lambda" else "function"
             if selected_kind and selected_kind != kind:
                 continue
-            nodes.append({
+            node_configurations = self._configurations_for_file(fn["file"], resource)
+            if selected_configuration and selected_configuration not in node_configurations:
+                continue
+            node = {
                 "node_id": node_ids[fn["id"]],
                 "kind": kind,
                 "name": fn["name"],
@@ -133,25 +186,48 @@ class DemoState:
                     "start_line": fn["line"],
                     "end_line": fn["end_line"],
                 },
+                "configurations": [selected_configuration] if selected_configuration else node_configurations,
                 "attributes": {"signature": fn["signature"], "entry_point": fn["id"] in analysis["entry_points"]},
-            })
+            }
+            nodes_by_id[node["node_id"]] = node
         edges = []
-        config_ids = [item["id"] for item in resource.get("configurations", []) if isinstance(item, dict) and item.get("id")]
         for edge in analysis["edges"]:
-            if selected_edge and edge["type"] != selected_edge:
-                continue
             if edge["source"] not in node_ids or edge["target"] not in node_ids:
+                continue
+            source_id = node_ids[edge["source"]]
+            target_id = node_ids[edge["target"]]
+            if source_id not in nodes_by_id or target_id not in nodes_by_id:
+                continue
+            edge_type = edge["type"] if edge["type"] in GRAPH_EDGE_TYPES else "unresolved"
+            if selected_edge and edge_type != selected_edge:
+                continue
+            raw_edge_configurations = edge.get("configurations")
+            if raw_edge_configurations is None:
+                raw_edge_configurations = config_ids
+            if isinstance(raw_edge_configurations, tuple):
+                raw_edge_configurations = list(raw_edge_configurations)
+            if not isinstance(raw_edge_configurations, list):
+                raw_edge_configurations = []
+            edge_configurations = list(dict.fromkeys(
+                value for value in raw_edge_configurations
+                if isinstance(value, str) and (not config_ids or value in config_ids)
+            ))
+            if selected_configuration and selected_configuration not in edge_configurations:
                 continue
             edge_id = "e_" + hashlib.sha1(
                 f"{api_id}:{edge['source']}:{edge['target']}:{edge['type']}:{edge['line']}".encode("utf-8")
             ).hexdigest()[:14]
-            semantics = "dispatch" if edge["type"] in {"async", "callback", "function_pointer"} else "call"
+            semantics = {
+                "registers_callback": "registration",
+                "scheduled_by": "dispatch",
+                "invokes_callback": "dispatch",
+            }.get(edge["type"], "dispatch" if edge["type"] in {"async", "callback", "function_pointer"} else "call")
             resolution = "observed" if edge["type"] == "direct" else "inferred"
             edges.append({
                 "edge_id": edge_id,
-                "source": node_ids[edge["source"]],
-                "target": node_ids[edge["target"]],
-                "type": edge["type"] if edge["type"] in {"direct", "async", "callback", "function_pointer"} else "unresolved",
+                "source": source_id,
+                "target": target_id,
+                "type": edge_type,
                 "semantics": semantics,
                 "resolution": resolution,
                 "confidence": edge["confidence"],
@@ -160,19 +236,127 @@ class DemoState:
                     "location": {"file": edge["file"], "start_line": edge["line"]},
                     "text": edge["evidence"],
                 }],
-                "configurations": config_ids,
+                "configurations": [selected_configuration] if selected_configuration else edge_configurations,
             })
         try:
-            limit = max(1, min(5000, int(params.get("limit", "500"))))
-        except ValueError:
-            limit = 500
+            limit = int(params.get("limit", "500"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("limit 必须是 1-5000 的整数") from exc
+        if not 1 <= limit <= 5000:
+            raise ValueError("limit 必须是 1-5000 的整数")
+
+        ordered_edges = sorted(edges, key=lambda item: item["edge_id"])
+        incident_node_ids = {
+            node_id
+            for edge in ordered_edges
+            for node_id in (edge["source"], edge["target"])
+        }
+        isolated_nodes = [] if selected_edge else sorted(
+            (node for node_id, node in nodes_by_id.items() if node_id not in incident_node_ids),
+            key=lambda item: item["node_id"],
+        )
+        records = [("edge", edge) for edge in ordered_edges]
+        records.extend(("node", node) for node in isolated_nodes)
+        fingerprint = self._graph_cursor_fingerprint(api_id, params)
+        offset = self._decode_graph_cursor(params.get("cursor"), fingerprint)
+        if offset > len(records):
+            raise ValueError("cursor 已超出当前图查询范围")
+        page_records = records[offset:offset + limit]
+        page_edges = [item for kind, item in page_records if kind == "edge"]
+        page_node_ids = {
+            node_id
+            for edge in page_edges
+            for node_id in (edge["source"], edge["target"])
+        }
+        page_node_ids.update(item["node_id"] for kind, item in page_records if kind == "node")
+        page_nodes = sorted(
+            (nodes_by_id[node_id] for node_id in page_node_ids),
+            key=lambda item: item["node_id"],
+        )
+        next_offset = offset + len(page_records)
+        has_more = next_offset < len(records)
         return {
             "resource_type": "graph",
             "schema_version": "1.0",
             "analysis_id": api_id,
-            "graph": {"nodes": nodes[:limit], "edges": edges[:limit]},
-            "page": {"limit": limit, "cursor": params.get("cursor"), "next_cursor": None, "has_more": False},
+            "graph": {"nodes": page_nodes, "edges": page_edges},
+            "page": {
+                "limit": limit,
+                "cursor": params.get("cursor"),
+                "next_cursor": self._encode_graph_cursor(next_offset, fingerprint) if has_more else None,
+                "has_more": has_more,
+            },
         }
+
+    @staticmethod
+    def _file_scope(relative_file: str) -> str:
+        parts = {part.lower() for part in Path(relative_file).parts}
+        if "win" in parts or "windows" in parts:
+            return "windows"
+        if "unix" in parts:
+            return "unix"
+        return "common"
+
+    @classmethod
+    def _configuration_scope(cls, configuration: dict) -> str:
+        text = " ".join(
+            str(configuration.get(key, ""))
+            for key in ("id", "target", "compiler")
+        ).lower()
+        defines = configuration.get("defines")
+        if isinstance(defines, dict):
+            text += " " + " ".join(str(key).lower() for key in defines)
+        if any(token in text for token in ("windows", "win32", "msvc", "mingw")):
+            return "windows"
+        if any(token in text for token in ("linux", "darwin", "macos", "macosx", "unix", "posix", "bsd")):
+            return "unix"
+        return "common"
+
+    @classmethod
+    def _configurations_for_file(cls, relative_file: str, resource: dict) -> list[str]:
+        configurations = resource.get("configurations", [])
+        if not isinstance(configurations, list):
+            return []
+        file_scope = cls._file_scope(relative_file)
+        result = []
+        for configuration in configurations:
+            if not isinstance(configuration, dict) or not isinstance(configuration.get("id"), str):
+                continue
+            config_scope = cls._configuration_scope(configuration)
+            if file_scope == "common" or config_scope == "common" or file_scope == config_scope:
+                result.append(configuration["id"])
+        return result
+
+    @staticmethod
+    def _graph_cursor_fingerprint(api_id: str, params: dict[str, str]) -> str:
+        material = "\0".join([
+            api_id,
+            params.get("configuration_id", ""),
+            params.get("node_kind", ""),
+            params.get("edge_type", ""),
+        ])
+        return hashlib.sha1(material.encode("utf-8")).hexdigest()[:16]
+
+    @staticmethod
+    def _encode_graph_cursor(offset: int, fingerprint: str) -> str:
+        return f"cur_{offset}_{fingerprint}"
+
+    @staticmethod
+    def _decode_graph_cursor(cursor: str | None, fingerprint: str) -> int:
+        if cursor is None:
+            return 0
+        if not isinstance(cursor, str):
+            raise ValueError("cursor 格式无效")
+        parts = cursor.split("_")
+        if len(parts) != 3 or parts[0] != "cur" or parts[2] != fingerprint:
+            raise ValueError("cursor 不属于当前分析或过滤条件")
+        try:
+            offset = int(parts[1])
+        except ValueError as exc:
+            raise ValueError("cursor 格式无效") from exc
+        if offset < 0:
+            raise ValueError("cursor 格式无效")
+        return offset
 
     def api_query(self, body: dict) -> dict:
         api_id = body.get("analysis_id")
@@ -182,25 +366,134 @@ class DemoState:
         if not isinstance(question, str) or not question.strip():
             raise ValueError("question 不能为空")
         resource = self.api_resources[api_id]
-        reply = self.query(resource["_analysis_key"], question)
-        query_id = "q_" + hashlib.sha1(f"{api_id}:{question}".encode("utf-8")).hexdigest()[:14]
+        analysis = self.analyses[resource["_analysis_key"]]
+        scope = body.get("scope") if isinstance(body.get("scope"), dict) else {}
+        configuration_ids = scope.get("configuration_ids", [])
+        if configuration_ids is None:
+            configuration_ids = []
+        if not isinstance(configuration_ids, list) or any(not isinstance(item, str) for item in configuration_ids):
+            raise ValueError("scope.configuration_ids 必须是字符串数组")
+        known_configurations = {
+            item.get("id") for item in resource.get("configurations", [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        unknown_configurations = set(configuration_ids) - known_configurations
+        if unknown_configurations:
+            raise ValueError(f"configuration_id 不属于分析 {api_id}：{sorted(unknown_configurations)[0]}")
+        edge_types = scope.get("edge_types", [])
+        if edge_types is None:
+            edge_types = []
+        if not isinstance(edge_types, list) or any(item not in GRAPH_EDGE_TYPES for item in edge_types):
+            raise ValueError("scope.edge_types 包含无效边类型")
+        direction = scope.get("direction", "both")
+        if direction not in {"forward", "backward", "both"}:
+            raise ValueError("scope.direction 无效")
+        try:
+            max_hops = int(scope.get("max_hops", 3))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("scope.max_hops 必须是 0-8 的整数") from exc
+        if not 0 <= max_hops <= 8:
+            raise ValueError("scope.max_hops 必须是 0-8 的整数")
+
+        raw_functions = {item["id"]: item for item in analysis["functions"]}
+        raw_node_ids = {f"n_{item_id}" for item_id in raw_functions}
+        requested_nodes = scope.get("node_ids", [])
+        if requested_nodes is None:
+            requested_nodes = []
+        if not isinstance(requested_nodes, list) or any(item not in raw_node_ids for item in requested_nodes):
+            raise ValueError("scope.node_ids 必须属于当前分析")
+
+        def edge_allowed(edge: dict) -> bool:
+            if edge_types and edge["type"] not in edge_types:
+                return False
+            if not configuration_ids:
+                return True
+            values = edge.get("configurations")
+            if values is None:
+                return True
+            if isinstance(values, tuple):
+                values = list(values)
+            return bool(set(values) & set(configuration_ids))
+
+        scoped_edges = [edge for edge in analysis["edges"] if edge_allowed(edge)]
+        # Keep the language answer grounded in exactly the same edge slice.
+        scoped_analysis = dict(analysis)
+        scoped_analysis["edges"] = scoped_edges
+        reply = self.explainer.answer(scoped_analysis, question)
+        reply_focus = [item for item in reply.get("focus", []) if item in raw_functions]
+        focus = [item.removeprefix("n_") for item in requested_nodes] if requested_nodes else reply_focus
+        if not focus:
+            focus = list(analysis.get("entry_points", []))[:4]
+
+        edge_ids: dict[tuple[str, str, str, int], str] = {}
+        public_edges: list[dict] = []
+        for edge in scoped_edges:
+            key = (edge["source"], edge["target"], edge["type"], edge["line"])
+            public_id = "e_" + hashlib.sha1(
+                f"{api_id}:{edge['source']}:{edge['target']}:{edge['type']}:{edge['line']}".encode("utf-8")
+            ).hexdigest()[:14]
+            edge_ids[key] = public_id
+            public_edges.append({**edge, "edge_id": public_id})
+        adjacency: dict[str, list[tuple[str, dict]]] = defaultdict(list)
+        for edge in public_edges:
+            if direction in {"forward", "both"}:
+                adjacency[edge["source"]].append((edge["target"], edge))
+            if direction in {"backward", "both"}:
+                adjacency[edge["target"]].append((edge["source"], edge))
+        paths: list[dict] = []
+        for start in focus:
+            queue = deque([(start, [start], [])])
+            while queue and len(paths) < 20:
+                node, node_path, path_edges = queue.popleft()
+                if path_edges:
+                    paths.append({
+                        "label": " -> ".join(raw_functions[item]["name"] for item in node_path),
+                        "node_ids": [f"n_{item}" for item in node_path],
+                        "edge_ids": [edge["edge_id"] for edge in path_edges],
+                    })
+                if len(path_edges) >= max_hops:
+                    continue
+                for target, edge in adjacency.get(node, []):
+                    if target in node_path:
+                        continue
+                    queue.append((target, node_path + [target], path_edges + [edge]))
+        include_source = body.get("include_source", True)
         citations = []
-        for citation in reply.get("citations", []):
-            citations.append({
-                "file": citation["file"],
-                "line": citation["line"],
-                "text": citation.get("evidence", ""),
-            })
-        unresolved = self.analyses[resource["_analysis_key"]].get("unresolved_calls", [])
+        if include_source:
+            seen_citations = set()
+            for edge in public_edges:
+                evidence = edge.get("evidence", "")
+                if not evidence:
+                    continue
+                marker = (edge["file"], edge["line"], evidence)
+                if marker in seen_citations:
+                    continue
+                seen_citations.add(marker)
+                citations.append({
+                    "file": edge["file"],
+                    "line": edge["line"],
+                    "text": evidence,
+                    "edge_id": edge["edge_id"],
+                })
+                if len(citations) >= 32:
+                    break
+        unresolved = analysis.get("unresolved_calls", [])
+        query_id = "q_" + hashlib.sha1(
+            json.dumps(body, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:14]
+        path_confidences = [
+            min((edge["confidence"] for edge in public_edges if edge["edge_id"] in path["edge_ids"]), default=0.0)
+            for path in paths
+        ]
         return {
             "resource_type": "query",
             "schema_version": "1.0",
             "query_id": query_id,
             "analysis_id": api_id,
             "answer": reply["answer"],
-            "confidence": 0.82 if citations else 0.55,
-            "focus": [f"n_{item.removeprefix('n_')}" if item.startswith("n_") else f"n_{item}" for item in reply.get("focus", [])],
-            "paths": [],
+            "confidence": min(path_confidences) if path_confidences else (0.82 if citations else 0.55),
+            "focus": list(dict.fromkeys(f"n_{item}" for item in focus)),
+            "paths": paths,
             "citations": citations,
             "uncertainty": {
                 "has_unresolved": bool(unresolved),

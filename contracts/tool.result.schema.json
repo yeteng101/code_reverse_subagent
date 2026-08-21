@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://code-reverse-agent.local/schemas/tool.result.schema.json",
+  "title": "SubAgentToolResult",
+  "description": "证据检索工具的统一返回信封；成功结果按 tool_name 约束 result 类型。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["resource_type", "schema_version", "tool_call_id", "analysis_id", "tool_name", "ok", "evidence"],
+  "properties": {
+    "resource_type": { "const": "tool_result" },
+    "schema_version": { "type": "string", "const": "1.0" },
+    "tool_call_id": { "type": "string", "pattern": "^tc_[A-Za-z0-9_-]+$" },
+    "analysis_id": { "type": "string", "pattern": "^an_[A-Za-z0-9_-]+$" },
+    "tool_name": { "$ref": "tool.invoke.schema.json#/$defs/toolName" },
+    "ok": { "type": "boolean" },
+    "result": { "type": "object" },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "graph.response.schema.json#/$defs/evidence" },
+      "maxItems": 100
+    },
+    "pagination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["has_more"],
+      "properties": {
+        "next_cursor": { "type": ["string", "null"] },
+        "has_more": { "type": "boolean" }
+      }
+    },
+    "error": { "$ref": "error.schema.json" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "ok": { "const": true } }, "required": ["ok"] },
+      "then": {
+        "required": ["result"],
+        "not": { "required": ["error"] }
+      },
+      "else": {
+        "required": ["error"],
+        "not": { "required": ["result"] }
+      }
+    },
+    {
+      "if": {
+        "properties": { "ok": { "const": true }, "tool_name": { "const": "find_symbol" } },
+        "required": ["ok", "tool_name"]
+      },
+      "then": { "properties": { "result": { "$ref": "#/$defs/symbolResult" } } }
+    },
+    {
+      "if": {
+        "properties": { "ok": { "const": true }, "tool_name": { "const": "get_call_edges" } },
+        "required": ["ok", "tool_name"]
+      },
+      "then": { "properties": { "result": { "$ref": "#/$defs/edgeResult" } } }
+    },
+    {
+      "if": {
+        "properties": { "ok": { "const": true }, "tool_name": { "const": "trace_async_chain" } },
+        "required": ["ok", "tool_name"]
+      },
+      "then": { "properties": { "result": { "$ref": "#/$defs/asyncChainResult" } } }
+    },
+    {
+      "if": {
+        "properties": { "ok": { "const": true }, "tool_name": { "const": "resolve_pointer" } },
+        "required": ["ok", "tool_name"]
+      },
+      "then": { "properties": { "result": { "$ref": "#/$defs/pointerResult" } } }
+    },
+    {
+      "if": {
+        "properties": { "ok": { "const": true }, "tool_name": { "const": "read_slice" } },
+        "required": ["ok", "tool_name"]
+      },
+      "then": { "properties": { "result": { "$ref": "#/$defs/sourceSliceResult" } } }
+    },
+    {
+      "if": {
+        "properties": { "ok": { "const": true }, "tool_name": { "const": "query_configuration" } },
+        "required": ["ok", "tool_name"]
+      },
+      "then": { "properties": { "result": { "$ref": "#/$defs/configurationResult" } } }
+    },
+    {
+      "if": {
+        "properties": { "ok": { "const": true }, "tool_name": { "const": "report_uncertainty" } },
+        "required": ["ok", "tool_name"]
+      },
+      "then": { "properties": { "result": { "$ref": "#/$defs/uncertaintyResult" } } }
+    }
+  ],
+  "$defs": {
+    "symbolResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "items"],
+      "properties": {
+        "result_type": { "const": "symbols" },
+        "items": { "type": "array", "items": { "$ref": "graph.response.schema.json#/$defs/node" } }
+      }
+    },
+    "edgeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "items"],
+      "properties": {
+        "result_type": { "const": "edges" },
+        "items": { "type": "array", "items": { "$ref": "graph.response.schema.json#/$defs/edge" } }
+      }
+    },
+    "asyncChainResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "items"],
+      "properties": {
+        "result_type": { "const": "paths" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/asyncPath" }, "maxItems": 20 }
+      }
+    },
+    "asyncPath": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path_id", "node_ids", "edge_ids", "stages", "resolution", "confidence"],
+      "properties": {
+        "path_id": { "type": "string", "pattern": "^p_[A-Za-z0-9_-]+$" },
+        "label": { "type": "string" },
+        "node_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
+          "minItems": 1
+        },
+        "edge_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^e_[A-Za-z0-9_-]+$" }
+        },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "node_id"],
+            "properties": {
+              "kind": { "type": "string", "enum": ["registration", "scheduling", "execution"] },
+              "node_id": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
+              "edge_id": { "type": "string", "pattern": "^e_[A-Za-z0-9_-]+$" }
+            }
+          }
+        },
+        "resolution": { "$ref": "graph.response.schema.json#/$defs/resolution" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "pointerResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "items"],
+      "properties": {
+        "result_type": { "const": "pointer_candidates" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/pointerCandidate" } }
+      }
+    },
+    "pointerCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_node_id", "resolution", "confidence", "rationale", "configurations"],
+      "properties": {
+        "target_node_id": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
+        "resolution": { "$ref": "graph.response.schema.json#/$defs/resolution" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "configurations": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "sourceSliceResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "items"],
+      "properties": {
+        "result_type": { "const": "source_slices" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/sourceSlice" } }
+      }
+    },
+    "sourceSlice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "start_line", "end_line", "code"],
+      "properties": {
+        "file": { "type": "string", "minLength": 1 },
+        "start_line": { "type": "integer", "minimum": 1 },
+        "end_line": { "type": "integer", "minimum": 1 },
+        "language": { "type": "string" },
+        "code": { "type": "string", "maxLength": 50000 },
+        "snippet_hash": { "type": "string" }
+      }
+    },
+    "configurationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "items"],
+      "properties": {
+        "result_type": { "const": "configurations" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["configuration", "active"],
+            "properties": {
+              "configuration": { "$ref": "analysis.create.schema.json#/$defs/configuration" },
+              "active": { "type": "boolean" },
+              "source": { "type": "string", "enum": ["compile_commands", "build_file", "manual", "inferred"] },
+              "variant_edge_ids": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^e_[A-Za-z0-9_-]+$" },
+                "uniqueItems": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "uncertaintyCode": {
+      "type": "string",
+      "enum": [
+        "UNRESOLVED_TARGET",
+        "MISSING_BUILD_CONFIGURATION",
+        "LOW_CONFIDENCE",
+        "CONDITIONAL_VARIANT",
+        "SOURCE_UNAVAILABLE",
+        "EVIDENCE_GAP"
+      ]
+    },
+    "uncertaintyResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "items"],
+      "properties": {
+        "result_type": { "const": "uncertainties" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/uncertaintyItem" } }
+      }
+    },
+    "uncertaintyItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": { "$ref": "#/$defs/uncertaintyCode" },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "minLength": 1 },
+        "node_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
+          "uniqueItems": true
+        },
+        "edge_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^e_[A-Za-z0-9_-]+$" },
+          "uniqueItems": true
+        },
+        "recommended_action": { "type": "string" }
+      }
+    }
+  }
+}

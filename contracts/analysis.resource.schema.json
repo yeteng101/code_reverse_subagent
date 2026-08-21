@@ -41,6 +41,7 @@
       "type": "array",
       "items": { "$ref": "analysis.create.schema.json#/$defs/configuration" }
     },
+    "profile": { "$ref": "#/$defs/profile" },
     "limitations": { "type": "array", "items": { "type": "string" } },
     "error": { "$ref": "error.schema.json" },
     "timestamps": {
@@ -64,6 +65,32 @@
     }
   },
   "$defs": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "status", "evidence_basis", "signals", "callback_slots", "configuration_separation", "limitations"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["libuv", "redis", "generic_c_cpp"] },
+        "status": { "type": "string", "enum": ["source_verified", "synthetic_validation", "partial", "unclassified"] },
+        "evidence_basis": { "type": "string", "enum": ["repository_snapshot", "synthetic_fixture", "workspace_source"] },
+        "signals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["symbol", "file", "line"],
+            "properties": {
+              "symbol": { "type": "string", "minLength": 1 },
+              "file": { "type": "string", "minLength": 1 },
+              "line": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "callback_slots": { "type": "integer", "minimum": 0 },
+        "configuration_separation": { "type": "boolean" },
+        "limitations": { "type": "array", "items": { "type": "string" } }
+      }
+    },
     "health": {
       "type": "object",
       "additionalProperties": false,

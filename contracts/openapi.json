@@ -71,10 +71,10 @@
         "tags": ["graph"],
         "operationId": "getGraph",
         "parameters": [
-          { "name": "configuration_id", "in": "query", "schema": { "type": "string" } },
-          { "name": "node_kind", "in": "query", "schema": { "type": "string" } },
-          { "name": "edge_type", "in": "query", "schema": { "type": "string" } },
-          { "name": "cursor", "in": "query", "schema": { "type": "string" } },
+          { "name": "configuration_id", "in": "query", "schema": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" } },
+          { "name": "node_kind", "in": "query", "schema": { "$ref": "graph.response.schema.json#/$defs/nodeKind" } },
+          { "name": "edge_type", "in": "query", "schema": { "$ref": "graph.response.schema.json#/$defs/edgeType" } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "minLength": 1, "maxLength": 512 } },
           { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 5000, "default": 500 } }
         ],
         "responses": {
@@ -109,6 +109,10 @@
         "schema": { "type": "string", "pattern": "^an_[A-Za-z0-9_-]+$" }
       }
     },
+    "schemas": {
+      "SubAgentToolInvocation": { "$ref": "tool.invoke.schema.json" },
+      "SubAgentToolResult": { "$ref": "tool.result.schema.json" }
+    },
     "responses": {
       "BadRequest": {
         "description": "请求参数错误",
@@ -119,5 +123,19 @@
         "content": { "application/json": { "schema": { "$ref": "error.schema.json" } } }
       }
     }
+  },
+  "x-subagent-tool-protocol": {
+    "description": "Query Agent 与可信证据工具之间的内部 JSON 协议；不等同于公开 HTTP API。",
+    "invocationSchema": { "$ref": "tool.invoke.schema.json" },
+    "resultSchema": { "$ref": "tool.result.schema.json" },
+    "tools": [
+      "find_symbol",
+      "get_call_edges",
+      "trace_async_chain",
+      "resolve_pointer",
+      "read_slice",
+      "query_configuration",
+      "report_uncertainty"
+    ]
   }
 }

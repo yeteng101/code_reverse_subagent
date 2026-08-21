@@ -1,6 +1,6 @@
 const state = {
   analysis: null,
-  activeEdges: new Set(["direct", "async", "callback", "function_pointer"]),
+  activeEdges: new Set(["direct", "async", "callback", "function_pointer", "registers_callback", "scheduled_by", "invokes_callback"]),
   selectedNode: null,
   queryFocus: new Set(),
   transform: { x: 0, y: 0, scale: 1 },
@@ -152,9 +152,13 @@ function renderGraph() {
   const search = $("#function-search").value.trim().toLowerCase();
 
   const defs = svgElement("defs");
-  ["direct", "async", "callback", "function_pointer"].forEach((type) => {
+  const edgeColors = {
+    direct: "#9aa7a0", async: "#b36b00", callback: "#326ca8", function_pointer: "#7654a8",
+    registers_callback: "#13795b", scheduled_by: "#b36b00", invokes_callback: "#326ca8",
+  };
+  Object.keys(edgeColors).forEach((type) => {
     const marker = svgElement("marker", { id: `arrow-${type}`, viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "5", markerHeight: "5", orient: "auto-start-reverse" });
-    marker.appendChild(svgElement("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: type === "async" ? "#b36b00" : type === "callback" ? "#326ca8" : type === "function_pointer" ? "#7654a8" : "#9aa7a0" }));
+    marker.appendChild(svgElement("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: edgeColors[type] }));
     defs.appendChild(marker);
   });
   root.appendChild(defs);
@@ -251,6 +255,7 @@ function renderOverviewAnswer() {
     <div class="evidence-list">
       <div class="evidence-item"><strong>direct · ${s.direct_calls}</strong><code>编译期可直接解析的函数调用</code></div>
       <div class="evidence-item"><strong>async / callback · ${s.async_calls + s.callback_calls}</strong><code>根据调度函数与回调参数推断</code></div>
+      <div class="evidence-item"><strong>注册 / 调度 / 执行 · ${(s.registers_callback_calls || 0) + (s.scheduled_by_calls || 0) + (s.invokes_callback_calls || 0)}</strong><code>领域规则分解的异步回调生命周期</code></div>
       <div class="evidence-item"><strong>function pointer · ${s.function_pointer_calls}</strong><code>由指针赋值和调用位置联合推断</code></div>
     </div>
   `;

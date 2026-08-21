@@ -10,7 +10,7 @@
     "schema_version": { "type": "string", "const": "1.0" },
     "query_id": { "type": "string", "pattern": "^q_[A-Za-z0-9_-]+$" },
     "analysis_id": { "type": "string", "pattern": "^an_[A-Za-z0-9_-]+$" },
-    "answer": { "type": "string" },
+    "answer": { "type": "string", "minLength": 1 },
     "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
     "focus": { "type": "array", "items": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" }, "uniqueItems": true },
     "paths": {
@@ -21,8 +21,15 @@
         "required": ["node_ids", "edge_ids"],
         "properties": {
           "label": { "type": "string" },
-          "node_ids": { "type": "array", "items": { "type": "string" } },
-          "edge_ids": { "type": "array", "items": { "type": "string" } }
+          "node_ids": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
+            "minItems": 1
+          },
+          "edge_ids": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^e_[A-Za-z0-9_-]+$" }
+          }
         }
       },
       "maxItems": 20
@@ -34,9 +41,9 @@
         "additionalProperties": false,
         "required": ["file", "line", "text"],
         "properties": {
-          "file": { "type": "string" },
+          "file": { "type": "string", "minLength": 1 },
           "line": { "type": "integer", "minimum": 1 },
-          "text": { "type": "string" },
+          "text": { "type": "string", "minLength": 1 },
           "node_id": { "type": "string" },
           "edge_id": { "type": "string" }
         }
@@ -49,7 +56,7 @@
       "required": ["has_unresolved", "items"],
       "properties": {
         "has_unresolved": { "type": "boolean" },
-        "items": { "type": "array", "items": { "type": "string" } }
+        "items": { "type": "array", "items": { "type": "string", "minLength": 1 } }
       }
     },
     "model": {

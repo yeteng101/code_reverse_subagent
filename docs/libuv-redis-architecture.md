@@ -59,6 +59,7 @@ flowchart LR
 | Query Agent | 基于图切片和证据回答问题 | 引用式答案 |
 
 当前 demo 用内存字典和轻量正则分析器替代 Graph Store、Clang 和队列；接口形状保持一致，后续可以逐层替换。
+七个内部证据工具已由 `subagent_tools.py` 实现为内存执行器，生产版只需替换其图存储和源码快照后端。
 
 ## 3. 分析生命周期
 
@@ -108,7 +109,7 @@ libuv 的关键不是普通的函数调用数量，而是“事件注册点 -> l
 | handle | `uv_handle_t` 及其派生结构、`uv_*_start` | `handle` 节点、`registers` 边 |
 | request | `uv_req_t`、`uv_*_init`、`uv_*_start` | `request` 节点 |
 | I/O poll | `uv__io_poll`、backend poll 实现 | `scheduler` 节点 |
-| callback | `uv_read_cb`、`uv_write_cb`、`uv_close_cb` 等 typedef | `callback` 节点和 `callback_registers` 边 |
+| callback | `uv_read_cb`、`uv_write_cb`、`uv_close_cb` 等 typedef | `callback` 节点和 `registers_callback` 边 |
 | loop phase | `uv__run_pending`、`uv__run_idle`、`uv__run_prepare`、`uv__run_check`、`uv__run_closing_handles` | `phase` 节点 |
 
 典型链条应表达为：
@@ -243,6 +244,21 @@ libuv 的平台 backend 和 Redis 的事件 backend 都必须通过配置维度�
 
 Agent 禁止直接把整个仓库内容放入 prompt，也禁止把 `unresolved` 边写成确定事实。
 
+### 8.1 SubAgent 工具边界
+
+Query Agent 只能通过七个受控工具读取事实：`find_symbol`、`get_call_edges`、
+`trace_async_chain`、`resolve_pointer`、`read_slice`、`query_configuration` 和
+`report_uncertainty`。工具调用和返回分别由 `contracts/tool.invoke.schema.json` 与
+`contracts/tool.result.schema.json` 约束，OpenAPI 的 `x-subagent-tool-protocol` 保存同一份注册表。
+
+每次调用必须带 `tool_call_id`、`analysis_id`、`tool_name` 和工具专属 `arguments`。执行器回显前三者，
+成功时返回 `ok=true` 与分型 `result`，失败时返回 `ok=false` 与 `error`，两种载荷互斥。所有返回都包含
+`evidence`；没有匹配事实时返回空数组，模型不能补造证据。
+
+`trace_async_chain` 的结果将路径步骤分为 `registration`、`scheduling` 和 `execution`；
+`resolve_pointer` 允许多个候选目标，但每个候选必须包含 `resolution`、`confidence`、推断理由和生效配置。
+`read_slice` 只能读取当前分析快照内的源码位置，禁止把工具参数解释成任意主机路径。
+
 ## 9. 存储与部署建议
 
 ### Demo
@@ -271,4 +287,3 @@ Agent 禁止直接把整个仓库内容放入 prompt，也禁止把 `unresolved`
 - `libuv` 样例验收：loop、handle/request、poll、callback 链可见。
 - `redis` 样例验收：ae file event、time event、`aeProcessEvents` 和 `serverCron` 链可见。
 - 查询响应即使没有确定目标，也必须返回空 focus、未解析原因和证据。
-

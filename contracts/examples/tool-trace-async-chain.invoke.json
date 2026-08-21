@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "tool_call_id": "tc_libuv_read_chain_01",
+  "analysis_id": "an_01JLIBUVLINUXDEBUG",
+  "tool_name": "trace_async_chain",
+  "arguments": {
+    "start_node_id": "n_uv_read_start",
+    "end_node_id": "n_user_read_cb",
+    "configuration_ids": ["linux-debug"],
+    "edge_types": ["registers_callback", "scheduled_by", "invokes_callback"],
+    "direction": "forward",
+    "max_hops": 6,
+    "max_paths": 8,
+    "minimum_confidence": 0.7
+  }
+}

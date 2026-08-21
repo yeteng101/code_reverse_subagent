@@ -1,0 +1,147 @@
+{
+  "schema_version": "1.0",
+  "passed": true,
+  "targets": [
+    {
+      "target": "libuv",
+      "repository": "/Users/andye/Documents/New project/libuv",
+      "analyzed_path": "/Users/andye/Documents/New project/libuv/src",
+      "revision": "e43e3d8",
+      "profile": {
+        "kind": "libuv",
+        "status": "source_verified",
+        "evidence_basis": "repository_snapshot",
+        "signals": [
+          {
+            "symbol": "uv_run",
+            "file": "libuv/src/unix/core.c",
+            "line": 427
+          },
+          {
+            "symbol": "uv__io_poll",
+            "file": "libuv/src/unix/aix.c",
+            "line": 133
+          },
+          {
+            "symbol": "uv__io_cb",
+            "file": "libuv/src/unix/core.c",
+            "line": 906
+          },
+          {
+            "symbol": "uv__stream_io",
+            "file": "libuv/src/unix/stream.c",
+            "line": 1198
+          },
+          {
+            "symbol": "uv_read_start",
+            "file": "libuv/src/uv-common.c",
+            "line": 1068
+          }
+        ],
+        "callback_slots": 21,
+        "configuration_separation": false,
+        "limitations": [
+          "领域语义边为 inferred；当前 Demo 未隔离 Unix/Windows 编译配置"
+        ]
+      },
+      "summary": {
+        "file_count": 104,
+        "function_count": 1571,
+        "edge_count": 3093,
+        "macro_count": 1827,
+        "direct_calls": 3006,
+        "async_calls": 42,
+        "callback_calls": 15,
+        "function_pointer_calls": 0,
+        "registers_callback_calls": 13,
+        "scheduled_by_calls": 7,
+        "invokes_callback_calls": 10,
+        "callback_slot_count": 21
+      },
+      "edge_types": {
+        "async": 42,
+        "callback": 15,
+        "direct": 3006,
+        "invokes_callback": 10,
+        "registers_callback": 13,
+        "scheduled_by": 7
+      },
+      "checks": {
+        "profile_kind": true,
+        "profile_basis": true,
+        "required_symbols": true,
+        "required_semantic_edges": true,
+        "macro_evidence": true,
+        "callback_slot": true
+      },
+      "passed": true
+    },
+    {
+      "target": "redis",
+      "repository": "/Users/andye/Documents/New project/code_reverse_agent/samples/redis_event_loop.c",
+      "analyzed_path": "/Users/andye/Documents/New project/code_reverse_agent/samples/redis_event_loop.c",
+      "revision": null,
+      "profile": {
+        "kind": "redis",
+        "status": "synthetic_validation",
+        "evidence_basis": "synthetic_fixture",
+        "signals": [
+          {
+            "symbol": "aeMain",
+            "file": "code_reverse_agent/samples/redis_event_loop.c",
+            "line": 81
+          },
+          {
+            "symbol": "aeProcessEvents",
+            "file": "code_reverse_agent/samples/redis_event_loop.c",
+            "line": 74
+          },
+          {
+            "symbol": "aeCreateFileEvent",
+            "file": "code_reverse_agent/samples/redis_event_loop.c",
+            "line": 62
+          },
+          {
+            "symbol": "serverCron",
+            "file": "code_reverse_agent/samples/redis_event_loop.c",
+            "line": 39
+          }
+        ],
+        "callback_slots": 2,
+        "configuration_separation": false,
+        "limitations": [
+          "领域语义边为 inferred；当前 Demo 未隔离 Unix/Windows 编译配置"
+        ]
+      },
+      "summary": {
+        "file_count": 1,
+        "function_count": 8,
+        "edge_count": 11,
+        "macro_count": 6,
+        "direct_calls": 5,
+        "async_calls": 0,
+        "callback_calls": 0,
+        "function_pointer_calls": 0,
+        "registers_callback_calls": 2,
+        "scheduled_by_calls": 2,
+        "invokes_callback_calls": 2,
+        "callback_slot_count": 2
+      },
+      "edge_types": {
+        "direct": 5,
+        "invokes_callback": 2,
+        "registers_callback": 2,
+        "scheduled_by": 2
+      },
+      "checks": {
+        "profile_kind": true,
+        "profile_basis": true,
+        "required_symbols": true,
+        "required_semantic_edges": true,
+        "macro_evidence": true,
+        "callback_slot": true
+      },
+      "passed": true
+    }
+  ]
+}

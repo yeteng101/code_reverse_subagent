@@ -113,6 +113,9 @@ button:disabled { opacity: .55; cursor: wait; }
 .line { width: 24px; height: 0; border-top: 2px solid var(--border-strong); }
 .line.async { border-color: var(--amber); border-top-style: dashed; }
 .line.callback { border-color: var(--blue); border-top-style: dashed; }
+.line.registration { border-color: var(--accent); border-top-style: dashed; }
+.line.scheduling { border-color: var(--amber); border-top-style: dotted; }
+.line.invocation { border-color: var(--blue); border-top-style: solid; }
 .line.pointer { border-color: var(--purple); border-top-style: dotted; }
 .limitations p { color: var(--muted); font-size: 11px; line-height: 1.6; margin: 0; }
 
@@ -144,6 +147,9 @@ button:disabled { opacity: .55; cursor: wait; }
 .graph-edge.async { stroke: var(--amber); stroke-dasharray: 6 4; }
 .graph-edge.callback { stroke: var(--blue); stroke-dasharray: 4 3; }
 .graph-edge.function_pointer { stroke: var(--purple); stroke-dasharray: 2 3; }
+.graph-edge.registers_callback { stroke: var(--accent); stroke-dasharray: 7 3; }
+.graph-edge.scheduled_by { stroke: var(--amber); stroke-dasharray: 2 3; }
+.graph-edge.invokes_callback { stroke: var(--blue); stroke-width: 2.2; }
 .graph-node rect { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1; rx: 6; vector-effect: non-scaling-stroke; }
 .graph-node.entry rect { stroke: var(--accent); stroke-width: 2; }
 .graph-node.focus rect { fill: var(--accent-soft); stroke: var(--accent); }

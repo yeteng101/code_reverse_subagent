@@ -13,8 +13,18 @@
       "additionalProperties": false,
       "properties": {
         "node_ids": { "type": "array", "items": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" }, "maxItems": 100 },
-        "configuration_ids": { "type": "array", "items": { "type": "string" }, "maxItems": 32 },
-        "edge_types": { "type": "array", "items": { "type": "string" }, "maxItems": 16 },
+        "configuration_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+          "uniqueItems": true,
+          "maxItems": 32
+        },
+        "edge_types": {
+          "type": "array",
+          "items": { "$ref": "graph.response.schema.json#/$defs/edgeType" },
+          "uniqueItems": true,
+          "maxItems": 16
+        },
         "direction": { "type": "string", "enum": ["forward", "backward", "both"], "default": "both" },
         "max_hops": { "type": "integer", "minimum": 0, "maximum": 8, "default": 3 }
       }

@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://code-reverse-agent.local/schemas/tool.invoke.schema.json",
+  "title": "SubAgentToolInvocation",
+  "description": "SubAgent 推理层调用证据检索工具的内部协议，不直接暴露给未授权客户端。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool_call_id", "analysis_id", "tool_name", "arguments"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0" },
+    "tool_call_id": { "type": "string", "pattern": "^tc_[A-Za-z0-9_-]+$" },
+    "analysis_id": { "type": "string", "pattern": "^an_[A-Za-z0-9_-]+$" },
+    "tool_name": { "$ref": "#/$defs/toolName" },
+    "arguments": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "tool_name": { "const": "find_symbol" } }, "required": ["tool_name"] },
+      "then": { "properties": { "arguments": { "$ref": "#/$defs/findSymbolArguments" } } }
+    },
+    {
+      "if": { "properties": { "tool_name": { "const": "get_call_edges" } }, "required": ["tool_name"] },
+      "then": { "properties": { "arguments": { "$ref": "#/$defs/getCallEdgesArguments" } } }
+    },
+    {
+      "if": { "properties": { "tool_name": { "const": "trace_async_chain" } }, "required": ["tool_name"] },
+      "then": { "properties": { "arguments": { "$ref": "#/$defs/traceAsyncChainArguments" } } }
+    },
+    {
+      "if": { "properties": { "tool_name": { "const": "resolve_pointer" } }, "required": ["tool_name"] },
+      "then": { "properties": { "arguments": { "$ref": "#/$defs/resolvePointerArguments" } } }
+    },
+    {
+      "if": { "properties": { "tool_name": { "const": "read_slice" } }, "required": ["tool_name"] },
+      "then": { "properties": { "arguments": { "$ref": "#/$defs/readSliceArguments" } } }
+    },
+    {
+      "if": { "properties": { "tool_name": { "const": "query_configuration" } }, "required": ["tool_name"] },
+      "then": { "properties": { "arguments": { "$ref": "#/$defs/queryConfigurationArguments" } } }
+    },
+    {
+      "if": { "properties": { "tool_name": { "const": "report_uncertainty" } }, "required": ["tool_name"] },
+      "then": { "properties": { "arguments": { "$ref": "#/$defs/reportUncertaintyArguments" } } }
+    }
+  ],
+  "$defs": {
+    "toolName": {
+      "type": "string",
+      "enum": [
+        "find_symbol",
+        "get_call_edges",
+        "trace_async_chain",
+        "resolve_pointer",
+        "read_slice",
+        "query_configuration",
+        "report_uncertainty"
+      ]
+    },
+    "configurationIds": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+      "uniqueItems": true,
+      "maxItems": 32
+    },
+    "pageArguments": {
+      "type": "object",
+      "properties": {
+        "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 },
+        "cursor": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "findSymbolArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query"],
+      "properties": {
+        "query": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "match": { "type": "string", "enum": ["exact", "prefix", "substring"], "default": "exact" },
+        "kinds": {
+          "type": "array",
+          "items": { "$ref": "graph.response.schema.json#/$defs/nodeKind" },
+          "uniqueItems": true,
+          "maxItems": 20
+        },
+        "configuration_ids": { "$ref": "#/$defs/configurationIds" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 },
+        "cursor": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "getCallEdgesArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_id"],
+      "properties": {
+        "node_id": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
+        "direction": { "type": "string", "enum": ["incoming", "outgoing", "both"], "default": "both" },
+        "edge_types": {
+          "type": "array",
+          "items": { "$ref": "graph.response.schema.json#/$defs/edgeType" },
+          "uniqueItems": true,
+          "maxItems": 16
+        },
+        "configuration_ids": { "$ref": "#/$defs/configurationIds" },
+        "minimum_confidence": { "type": "number", "minimum": 0, "maximum": 1, "default": 0 },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 },
+        "cursor": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "traceAsyncChainArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_node_id"],
+      "properties": {
+        "start_node_id": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
+        "end_node_id": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
+        "configuration_ids": { "$ref": "#/$defs/configurationIds" },
+        "edge_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["callback", "async", "function_pointer", "registers_callback", "scheduled_by", "invokes_callback"]
+          },
+          "uniqueItems": true,
+          "default": ["registers_callback", "scheduled_by", "invokes_callback"]
+        },
+        "direction": { "type": "string", "enum": ["forward", "backward", "both"], "default": "forward" },
+        "max_hops": { "type": "integer", "minimum": 1, "maximum": 12, "default": 6 },
+        "max_paths": { "type": "integer", "minimum": 1, "maximum": 20, "default": 8 },
+        "minimum_confidence": { "type": "number", "minimum": 0, "maximum": 1, "default": 0 }
+      }
+    },
+    "resolvePointerArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["callsite"],
+      "properties": {
+        "callsite": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "source_node_id": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
+            "file": { "type": "string", "minLength": 1 },
+            "line": { "type": "integer", "minimum": 1 },
+            "expression": { "type": "string", "maxLength": 1000 }
+          },
+          "anyOf": [
+            { "required": ["source_node_id"] },
+            { "required": ["file", "line"] }
+          ]
+        },
+        "configuration_ids": { "$ref": "#/$defs/configurationIds" },
+        "include_inferred": { "type": "boolean", "default": true },
+        "max_candidates": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+      }
+    },
+    "readSliceArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "node_id": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
+        "edge_id": { "type": "string", "pattern": "^e_[A-Za-z0-9_-]+$" },
+        "file": { "type": "string", "minLength": 1 },
+        "start_line": { "type": "integer", "minimum": 1 },
+        "end_line": { "type": "integer", "minimum": 1 },
+        "context_lines": { "type": "integer", "minimum": 0, "maximum": 50, "default": 5 },
+        "configuration_id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" }
+      },
+      "anyOf": [
+        { "required": ["node_id"] },
+        { "required": ["edge_id"] },
+        { "required": ["file", "start_line"] }
+      ]
+    },
+    "queryConfigurationArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "configuration_ids": { "$ref": "#/$defs/configurationIds" },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "file": { "type": "string", "minLength": 1 },
+        "include_defines": { "type": "boolean", "default": false },
+        "include_variants": { "type": "boolean", "default": true },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 },
+        "cursor": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "reportUncertaintyArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "node_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
+          "uniqueItems": true,
+          "maxItems": 100
+        },
+        "edge_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^e_[A-Za-z0-9_-]+$" },
+          "uniqueItems": true,
+          "maxItems": 100
+        },
+        "configuration_ids": { "$ref": "#/$defs/configurationIds" },
+        "maximum_confidence": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.7 },
+        "codes": {
+          "type": "array",
+          "items": { "$ref": "tool.result.schema.json#/$defs/uncertaintyCode" },
+          "uniqueItems": true
+        },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 },
+        "cursor": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    }
+  }
+}

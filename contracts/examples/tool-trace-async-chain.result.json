@@ -1,0 +1,39 @@
+{
+  "resource_type": "tool_result",
+  "schema_version": "1.0",
+  "tool_call_id": "tc_libuv_read_chain_01",
+  "analysis_id": "an_01JLIBUVLINUXDEBUG",
+  "tool_name": "trace_async_chain",
+  "ok": true,
+  "result": {
+    "result_type": "paths",
+    "items": [
+      {
+        "path_id": "p_uv_read_linux_01",
+        "label": "uv_read_start -> poll -> uv__stream_io -> read_cb",
+        "node_ids": ["n_uv_read_start", "n_uv_io_poll", "n_uv_stream_io", "n_user_read_cb"],
+        "edge_ids": ["e_register_read_cb", "e_poll_stream_io", "e_invoke_read_cb"],
+        "stages": [
+          { "kind": "registration", "node_id": "n_uv_read_start", "edge_id": "e_register_read_cb" },
+          { "kind": "scheduling", "node_id": "n_uv_io_poll", "edge_id": "e_poll_stream_io" },
+          { "kind": "execution", "node_id": "n_uv_stream_io", "edge_id": "e_invoke_read_cb" }
+        ],
+        "resolution": "observed",
+        "confidence": 0.96
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "kind": "source",
+      "location": { "file": "src/unix/stream.c", "start_line": 1439 },
+      "text": "stream->read_cb = read_cb;"
+    },
+    {
+      "kind": "source",
+      "location": { "file": "src/unix/stream.c", "start_line": 1224 },
+      "text": "stream->read_cb(stream, nread, &buf);"
+    }
+  ],
+  "pagination": { "next_cursor": null, "has_more": false }
+}

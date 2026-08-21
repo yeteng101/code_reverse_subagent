@@ -36,7 +36,7 @@
       "additionalProperties": false,
       "required": ["file", "start_line"],
       "properties": {
-        "file": { "type": "string" },
+        "file": { "type": "string", "minLength": 1 },
         "start_line": { "type": "integer", "minimum": 1 },
         "end_line": { "type": "integer", "minimum": 1 },
         "start_column": { "type": "integer", "minimum": 1 },
@@ -50,7 +50,7 @@
       "properties": {
         "kind": { "type": "string", "enum": ["source", "ast", "macro", "build", "runtime"] },
         "location": { "$ref": "#/$defs/location" },
-        "text": { "type": "string", "maxLength": 2000 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 2000 },
         "snippet_hash": { "type": "string" }
       }
     },
@@ -60,30 +60,51 @@
       "required": ["node_id", "kind", "name", "location"],
       "properties": {
         "node_id": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
-        "kind": { "type": "string", "enum": ["repository", "module", "file", "function", "method", "type", "variable", "macro", "event_loop", "handle", "request", "callback", "scheduler", "io_watcher", "timer", "phase", "entry_point"] },
-        "name": { "type": "string" },
+        "kind": { "$ref": "#/$defs/nodeKind" },
+        "name": { "type": "string", "minLength": 1 },
         "qualified_name": { "type": "string" },
         "module_id": { "type": "string" },
         "location": { "$ref": "#/$defs/location" },
+        "configurations": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+          "uniqueItems": true
+        },
         "attributes": { "type": "object", "additionalProperties": true }
       }
     },
     "edge": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["edge_id", "source", "target", "type", "resolution", "confidence", "evidence"],
+      "required": ["edge_id", "source", "target", "type", "semantics", "resolution", "confidence", "evidence", "configurations"],
       "properties": {
         "edge_id": { "type": "string", "pattern": "^e_[A-Za-z0-9_-]+$" },
         "source": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
         "target": { "type": "string", "pattern": "^n_[A-Za-z0-9_-]+$" },
-        "type": { "type": "string", "enum": ["direct", "virtual", "callback", "async", "function_pointer", "registers_callback", "scheduled_by", "invokes_callback", "owns_lifecycle", "reads", "writes", "macro_variant", "unresolved"] },
+        "type": { "$ref": "#/$defs/edgeType" },
         "semantics": { "type": "string", "enum": ["call", "registration", "dispatch", "lifecycle", "data_flow", "configuration"] },
-        "resolution": { "type": "string", "enum": ["observed", "inferred", "unresolved"] },
+        "resolution": { "$ref": "#/$defs/resolution" },
         "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
         "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" }, "minItems": 1 },
-        "configurations": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "configurations": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+          "uniqueItems": true
+        },
         "attributes": { "type": "object", "additionalProperties": true }
       }
+    },
+    "nodeKind": {
+      "type": "string",
+      "enum": ["repository", "module", "file", "function", "method", "type", "variable", "macro", "event_loop", "handle", "request", "callback", "scheduler", "io_watcher", "timer", "phase", "entry_point"]
+    },
+    "edgeType": {
+      "type": "string",
+      "enum": ["direct", "virtual", "callback", "async", "function_pointer", "registers_callback", "scheduled_by", "invokes_callback", "owns_lifecycle", "reads", "writes", "macro_variant", "unresolved"]
+    },
+    "resolution": {
+      "type": "string",
+      "enum": ["observed", "inferred", "unresolved"]
     }
   }
 }
